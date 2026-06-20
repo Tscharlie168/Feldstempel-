@@ -15,7 +15,7 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Caveat:wght@700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#13161A; --panel:#1E232A; --panel2:#262C34; --line:#333B45;
@@ -145,6 +145,11 @@
   .text-in:focus{outline:none;border-color:var(--accent)}
   .text-in::placeholder{color:#5a626d}
 
+  .emoji-row{display:flex;flex-wrap:wrap;gap:6px}
+  .emoji-row button{font-size:20px;line-height:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:pointer;transition:.12s border-color}
+  .emoji-row button:hover{border-color:var(--accent)}
+  .emoji-row button:active{transform:translateY(1px)}
+
   .actions{display:flex;gap:10px;flex-wrap:wrap}
   .actions .btn{flex:1;justify-content:center;min-width:140px}
 
@@ -219,6 +224,53 @@
       </div>
     </div>
 
+    <!-- Gruß & Emoji -->
+    <div class="panel">
+      <div class="eye">Gruß & Emoji (zum Verschicken)</div>
+      <div class="field">
+        <label for="greet">Text</label>
+        <input class="text-in" id="greet" placeholder="z.B. Viele Grüße aus Langenargen!" maxlength="60">
+      </div>
+      <div class="field">
+        <label>Emoji einfügen</label>
+        <div class="emoji-row" id="emojiRow">
+          <button type="button">👋</button>
+          <button type="button">😊</button>
+          <button type="button">☀️</button>
+          <button type="button">❤️</button>
+          <button type="button">🎉</button>
+          <button type="button">🍻</button>
+          <button type="button">🏔️</button>
+          <button type="button">🌊</button>
+          <button type="button">👍</button>
+          <button type="button">😎</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Position</label>
+        <div class="seg" id="segGPos" role="group">
+          <button data-v="top" aria-pressed="true">Oben</button>
+          <button data-v="mid" aria-pressed="false">Mitte</button>
+          <button data-v="bot" aria-pressed="false">Unten</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Stil</label>
+        <div class="seg" id="segGStyle" role="group">
+          <button data-v="banner" aria-pressed="true">Banner</button>
+          <button data-v="outline" aria-pressed="false">Kontur</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Größe</label>
+        <div class="seg" id="segGSize" role="group">
+          <button data-v="0.8" aria-pressed="false">Klein</button>
+          <button data-v="1" aria-pressed="true">Mittel</button>
+          <button data-v="1.3" aria-pressed="false">Groß</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Aussehen -->
     <div class="panel">
       <div class="eye">Aussehen</div>
@@ -250,7 +302,8 @@
     </div>
 
     <div class="actions">
-      <button class="btn btn-primary" id="dlBtn">📤 Gestempeltes Bild sichern</button>
+      <button class="btn btn-primary" id="dlBtn">💾 Bild speichern</button>
+      <button class="btn btn-ghost" id="shareBtn">📤 Teilen</button>
       <button class="btn btn-ghost" id="newBtn">Neues Foto</button>
     </div>
 
@@ -2577,7 +2630,8 @@ var qrcode = function() {
     temp:null, code:null, app:null,
     style:"plate", pos:"bl", size:1,
     show:{time:true,coord:true,place:true,temp:true,cond:true,alt:false,qr:false},
-    proj:""
+    proj:"",
+    greet:"", greetPos:"top", greetStyle:"banner", greetSize:1
   };
 
   // ---------- Weather code -> text/icon (WMO) ----------
@@ -2769,6 +2823,13 @@ var qrcode = function() {
   const map={tTime:"time",tCoord:"coord",tPlace:"place",tTemp:"temp",tCond:"cond",tAlt:"alt",tQR:"qr"};
   Object.keys(map).forEach(id=>$(id).onchange=e=>{state.show[map[id]]=e.target.checked;render();});
   $("proj").oninput=e=>{state.proj=e.target.value.trim();render();};
+  $("greet").oninput=e=>{state.greet=e.target.value;render();};
+  $("emojiRow").querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>{ const g=$("greet"); g.value=g.value+b.textContent; state.greet=g.value; g.focus(); render(); };
+  });
+  bindSeg("segGPos",  v=>state.greetPos=v);
+  bindSeg("segGStyle",v=>state.greetStyle=v);
+  bindSeg("segGSize", v=>state.greetSize=parseFloat(v));
 
   $("newBtn").onclick=()=>{ $("editor").style.display="none"; drop.style.display="block"; resetData(); };
   function resetData(){ state.bitmap=null; $("camIn").value=""; $("fileIn").value=""; }
@@ -2801,6 +2862,8 @@ var qrcode = function() {
     cv.width=W; cv.height=H;
     ctx.clearRect(0,0,W,H);
     ctx.drawImage(state.bitmap,0,0,W,H);
+
+    drawGreeting(W,H);
 
     const lines=buildLines();
     if(lines.length){
@@ -2910,6 +2973,56 @@ var qrcode = function() {
     });
   }
 
+  function wrapLines(text,maxW,font){
+    ctx.font=font;
+    const words=text.split(/\s+/);
+    const lines=[]; let cur="";
+    for(const w of words){
+      const t=cur?cur+" "+w:w;
+      if(ctx.measureText(t).width<=maxW || !cur){ cur=t; }
+      else { lines.push(cur); cur=w; }
+    }
+    if(cur) lines.push(cur);
+    return lines;
+  }
+
+  function drawGreeting(W,H){
+    const text=(state.greet||"").trim();
+    if(!text) return;
+    const u=Math.min(W,H);
+    const f=Math.round(u*0.075*state.greetSize);
+    const font=`700 ${f}px "Caveat","Space Grotesk",sans-serif`;
+    const lines=wrapLines(text, W*0.86, font);
+    const lh=Math.round(f*1.12);
+    const blockH=lines.length*lh;
+    const margin=Math.round(u*0.05);
+    let top = state.greetPos==="top" ? margin
+            : state.greetPos==="bot" ? H-margin-blockH
+            : Math.round((H-blockH)/2);
+    const cx=W/2;
+    ctx.font=font; ctx.textAlign="center"; ctx.textBaseline="top";
+
+    if(state.greetStyle==="banner"){
+      let wMax=0; lines.forEach(l=>wMax=Math.max(wMax,ctx.measureText(l).width));
+      const padX=Math.round(f*0.55), padY=Math.round(f*0.32);
+      const bw=wMax+padX*2, bh=blockH+padY*2, bx=cx-bw/2, by=top-padY;
+      ctx.save();
+      ctx.shadowColor="rgba(0,0,0,.35)"; ctx.shadowBlur=u*0.02; ctx.shadowOffsetY=u*0.004;
+      ctx.fillStyle="rgba(17,19,23,0.72)";
+      roundRect(bx,by,bw,bh,Math.round(f*0.32)); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle="#FFFFFF";
+      lines.forEach((l,i)=>ctx.fillText(l, cx, top+i*lh));
+    } else {
+      ctx.lineJoin="round";
+      ctx.lineWidth=Math.max(2, f*0.16);
+      ctx.strokeStyle="rgba(10,11,13,0.85)";
+      ctx.fillStyle="#FFFFFF";
+      lines.forEach((l,i)=>{ const y=top+i*lh; ctx.strokeText(l,cx,y); ctx.fillText(l,cx,y); });
+    }
+    ctx.textAlign="left";
+  }
+
   function drawQR(W,H){
     if(!state.show.qr || state.lat==null || typeof qrcode==="undefined") return;
     const url=`https://maps.google.com/?q=${state.lat.toFixed(5)},${state.lon.toFixed(5)}`;
@@ -2945,7 +3058,7 @@ var qrcode = function() {
     }
   }
 
-  // ---------- Download / Teilen ----------
+  // ---------- Speichern / Teilen ----------
   function dataURLtoBlob(durl){
     const [head,b64]=durl.split(",");
     const mime=(head.match(/:(.*?);/)||[])[1]||"image/jpeg";
@@ -2953,25 +3066,35 @@ var qrcode = function() {
     for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
     return new Blob([u8],{type:mime});
   }
-
-  $("dlBtn").onclick=async ()=>{
-    if(!state.bitmap) return;
+  function buildImage(){
     render();
     const d=state.captured, p=n=>String(n).padStart(2,"0");
     const name=`feldstempel_${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.jpg`;
-    // toDataURL ist synchron -> die Nutzer-Geste bleibt erhalten (wichtig fürs Teilen auf iOS)
     const blob=dataURLtoBlob(cv.toDataURL("image/jpeg",0.92));
+    return {blob, name};
+  }
+  // Direkter Download – Android: Ordner „Downloads“; Desktop: Download-Ordner
+  function saveImage(){
+    if(!state.bitmap) return;
+    const {blob,name}=buildImage();
+    const a=document.createElement("a");
+    a.download=name; a.href=URL.createObjectURL(blob);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }
+  // Teilen-Menü – iPhone: „In Fotos sichern“; sonst Fallback auf Download
+  async function shareImage(){
+    if(!state.bitmap) return;
+    const {blob,name}=buildImage();
     const file=new File([blob],name,{type:"image/jpeg"});
-    // Handy (iPhone/Android): Teilen-Menü -> "In Fotos sichern"
     if(navigator.canShare && navigator.canShare({files:[file]})){
       try{ await navigator.share({files:[file]}); return; }
-      catch(e){ if(e && e.name==="AbortError") return; /* sonst weiter zum Fallback */ }
+      catch(e){ if(e && e.name==="AbortError") return; }
     }
-    // Desktop/Android-Fallback: direkter Download
-    const a=document.createElement("a");
-    a.download=name; a.href=URL.createObjectURL(blob); a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-  };
+    saveImage();
+  }
+  $("dlBtn").onclick=saveImage;
+  $("shareBtn").onclick=shareImage;
 
   // Re-render once fonts are ready so canvas text uses the right faces
   if(document.fonts && document.fonts.ready){ document.fonts.ready.then(()=>{ if(state.bitmap) render(); }); }
