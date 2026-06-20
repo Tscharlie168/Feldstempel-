@@ -4,11 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Feldstempel</title>
-<meta name="description" content="Fotos mit Zeit, Standort und Wetter stempeln">
+<meta name="description" content="Foto mit Standort, Wetter und Gruß stempeln">
 <meta name="theme-color" content="#13161A">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Feldstempel">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -197,7 +194,6 @@
       <div class="ritem"><span class="dot" id="dWx"></span><span class="rlabel">Wetter</span><span class="rval" id="vWx">—</span></div>
       <div class="loc-ctl" id="locCtl">
         <button class="btn btn-locate" id="gpsBtn">📍 Aktuellen Standort holen</button>
-        <button class="btn btn-ghost" id="ipBtn">Ungefähr (per Internet)</button>
         <input id="latIn" placeholder="Breite 47.5366" inputmode="decimal">
         <input id="lonIn" placeholder="Länge 9.5530" inputmode="decimal">
         <button class="btn btn-ghost" id="manualGo">Übernehmen</button>
@@ -210,7 +206,6 @@
       <div class="field">
         <div class="toggles">
           <label class="tg"><input type="checkbox" id="tTime" checked><span class="box"></span>Datum & Uhrzeit</label>
-          <label class="tg"><input type="checkbox" id="tCoord" checked><span class="box"></span>Koordinaten</label>
           <label class="tg"><input type="checkbox" id="tPlace" checked><span class="box"></span>Ortsname</label>
           <label class="tg"><input type="checkbox" id="tTemp" checked><span class="box"></span>Temperatur</label>
           <label class="tg"><input type="checkbox" id="tCond" checked><span class="box"></span>Wetterlage</label>
@@ -2629,7 +2624,7 @@ var qrcode = function() {
     place:null,
     temp:null, code:null, app:null,
     style:"plate", pos:"bl", size:1,
-    show:{time:true,coord:true,place:true,temp:true,cond:true,alt:false,qr:false},
+    show:{time:true,coord:false,place:true,temp:true,cond:true,alt:false,qr:false},
     proj:"",
     greet:"", greetPos:"top", greetStyle:"banner", greetSize:1
   };
@@ -2726,14 +2721,17 @@ var qrcode = function() {
     onLocation();
   };
   $("gpsBtn").onclick=requestLocation;
-  $("ipBtn").onclick=fetchIPLocation;
 
   function onLocation(){
     setDot("dGps","ok");
-    $("vGps").innerHTML=`<a href="https://www.google.com/maps?q=${state.lat},${state.lon}" target="_blank" rel="noopener">${fmtCoord(state.lat)}  ${fmtCoord(state.lon)} ↗</a>`;
+    setStandort("Position gefunden");
     render();
     fetchWeather();
     fetchPlace();
+  }
+
+  function setStandort(label){
+    $("vGps").innerHTML=`<a href="https://www.google.com/maps?q=${state.lat},${state.lon}" target="_blank" rel="noopener">${label} ↗</a>`;
   }
 
   async function fetchIPLocation(){
@@ -2788,7 +2786,7 @@ var qrcode = function() {
                   || a.quarter || a.hamlet || a.farm || a.village || null;
         const area = a.city || a.town || a.village || a.municipality || a.county || null;
         const parts=[...new Set([spot,area].filter(Boolean))];
-        if(parts.length){ state.place=parts.join(" · "); render(); return; }
+        if(parts.length){ state.place=parts.join(" · "); setStandort(state.place); render(); return; }
       }
     }catch(_){ /* weiter zum Fallback */ }
     // 2) Fallback: BigDataCloud – ortsgenau
@@ -2798,7 +2796,7 @@ var qrcode = function() {
       const j=await r.json();
       const parts=[j.locality||j.city, j.principalSubdivision].filter(Boolean);
       state.place = parts.join(", ") || j.countryName || null;
-      if(state.place) render();
+      if(state.place){ setStandort(state.place); render(); }
     }catch(_){ /* Ortsname ist optional */ }
   }
 
@@ -2820,7 +2818,7 @@ var qrcode = function() {
   bindSeg("segPos",  v=>state.pos=v);
   bindSeg("segSize", v=>state.size=parseFloat(v));
 
-  const map={tTime:"time",tCoord:"coord",tPlace:"place",tTemp:"temp",tCond:"cond",tAlt:"alt",tQR:"qr"};
+  const map={tTime:"time",tPlace:"place",tTemp:"temp",tCond:"cond",tAlt:"alt",tQR:"qr"};
   Object.keys(map).forEach(id=>$(id).onchange=e=>{state.show[map[id]]=e.target.checked;render();});
   $("proj").oninput=e=>{state.proj=e.target.value.trim();render();};
   $("greet").oninput=e=>{state.greet=e.target.value;render();};
