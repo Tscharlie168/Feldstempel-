@@ -2988,7 +2988,7 @@ var qrcode = function() {
     if(!text) return;
     const u=Math.min(W,H);
     const f=Math.round(u*0.075*state.greetSize);
-    const font=`700 ${f}px -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif`;
+    const font=`700 ${f}px "Helvetica Neue", Arial, sans-serif`;
     const lines=wrapLines(text, W*0.86, font);
     const lh=Math.round(f*1.12);
     const blockH=lines.length*lh;
